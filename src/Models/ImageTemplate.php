@@ -1,6 +1,6 @@
 <?php
 
-namespace Molham\DynamicImageComposer\Models;
+namespace Badrshs\DynamicImageComposer\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;

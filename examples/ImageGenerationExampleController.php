@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Examples;
 
 use App\Http\Controllers\Controller;
-use Molham\DynamicImageComposer\DynamicImageComposer;
-use Molham\DynamicImageComposer\Models\ImageTemplate;
-use Molham\DynamicImageComposer\Services\TemplateImageService;
+use Badrshs\DynamicImageComposer\DynamicImageComposer;
+use Badrshs\DynamicImageComposer\Models\ImageTemplate;
+use Badrshs\DynamicImageComposer\Services\TemplateImageService;
 
 /**
  * Example controller showing different ways to use the package

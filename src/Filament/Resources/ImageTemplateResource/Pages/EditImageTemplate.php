@@ -1,10 +1,10 @@
 <?php
 
-namespace Molham\DynamicImageComposer\Filament\Resources\ImageTemplateResource\Pages;
+namespace Badrshs\DynamicImageComposer\Filament\Resources\ImageTemplateResource\Pages;
 
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
-use Molham\DynamicImageComposer\Filament\Resources\ImageTemplateResource;
+use Badrshs\DynamicImageComposer\Filament\Resources\ImageTemplateResource;
 
 class EditImageTemplate extends EditRecord
 {

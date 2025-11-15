@@ -1,6 +1,6 @@
 <?php
 
-namespace Molham\DynamicImageComposer;
+namespace Badrshs\DynamicImageComposer;
 
 use ArPHP\I18N\Arabic;
 use Illuminate\Support\Facades\Log;

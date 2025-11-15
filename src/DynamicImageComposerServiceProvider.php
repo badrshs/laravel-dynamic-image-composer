@@ -1,9 +1,9 @@
 <?php
 
-namespace Molham\DynamicImageComposer;
+namespace Badrshs\DynamicImageComposer;
 
 use Illuminate\Support\ServiceProvider;
-use Molham\DynamicImageComposer\Services\TemplateImageService;
+use Badrshs\DynamicImageComposer\Services\TemplateImageService;
 
 class DynamicImageComposerServiceProvider extends ServiceProvider
 {

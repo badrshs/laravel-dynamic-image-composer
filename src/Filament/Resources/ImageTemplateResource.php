@@ -1,13 +1,13 @@
 <?php
 
-namespace Molham\DynamicImageComposer\Filament\Resources;
+namespace Badrshs\DynamicImageComposer\Filament\Resources;
 
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Molham\DynamicImageComposer\Models\ImageTemplate;
+use Badrshs\DynamicImageComposer\Models\ImageTemplate;
 
 class ImageTemplateResource extends Resource
 {
@@ -119,9 +119,9 @@ class ImageTemplateResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => \Molham\DynamicImageComposer\Filament\Resources\ImageTemplateResource\Pages\ListImageTemplates::route('/'),
-            'create' => \Molham\DynamicImageComposer\Filament\Resources\ImageTemplateResource\Pages\CreateImageTemplate::route('/create'),
-            'edit' => \Molham\DynamicImageComposer\Filament\Resources\ImageTemplateResource\Pages\EditImageTemplate::route('/{record}/edit'),
+            'index' => \Badrshs\DynamicImageComposer\Filament\Resources\ImageTemplateResource\Pages\ListImageTemplates::route('/'),
+            'create' => \Badrshs\DynamicImageComposer\Filament\Resources\ImageTemplateResource\Pages\CreateImageTemplate::route('/create'),
+            'edit' => \Badrshs\DynamicImageComposer\Filament\Resources\ImageTemplateResource\Pages\EditImageTemplate::route('/{record}/edit'),
         ];
     }
 }

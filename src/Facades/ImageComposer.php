@@ -1,6 +1,6 @@
 <?php
 
-namespace Molham\DynamicImageComposer\Facades;
+namespace Badrshs\DynamicImageComposer\Facades;
 
 use Illuminate\Support\Facades\Facade;
 
@@ -10,12 +10,12 @@ use Illuminate\Support\Facades\Facade;
  * @method static \Illuminate\Http\Response output(\GdImage $image, string $filename = 'image.png')
  * @method static void addOverlay(\GdImage $baseImage, string $overlayPath, array $config)
  *
- * @see \Molham\DynamicImageComposer\DynamicImageComposer
+ * @see \Badrshs\DynamicImageComposer\DynamicImageComposer
  */
 class ImageComposer extends Facade
 {
     protected static function getFacadeAccessor(): string
     {
-        return \Molham\DynamicImageComposer\DynamicImageComposer::class;
+        return \Badrshs\DynamicImageComposer\DynamicImageComposer::class;
     }
 }

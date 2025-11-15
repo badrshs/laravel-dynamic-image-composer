@@ -18,7 +18,7 @@ Compose images dynamically from templates with text and image overlays. Perfect 
 Install via Composer:
 
 ```bash
-composer require molham/laravel-dynamic-image-composer
+composer require badrshs/laravel-dynamic-image-composer
 ```
 
 Publish configuration and migrations:
@@ -34,7 +34,7 @@ php artisan migrate
 ### Basic Usage
 
 ```php
-use Molham\DynamicImageComposer\DynamicImageComposer;
+use Badrshs\DynamicImageComposer\DynamicImageComposer;
 
 $composer = new DynamicImageComposer();
 
@@ -98,7 +98,7 @@ return $composer->output($image);
 ### Using Database Templates
 
 ```php
-use Molham\DynamicImageComposer\Models\ImageTemplate;
+use Badrshs\DynamicImageComposer\Models\ImageTemplate;
 
 // Create a template
 $template = ImageTemplate::create([
@@ -185,7 +185,7 @@ Each field supports these options:
 If you're using Filament, register the resource in your panel:
 
 ```php
-use Molham\DynamicImageComposer\Filament\Resources\ImageTemplateResource;
+use Badrshs\DynamicImageComposer\Filament\Resources\ImageTemplateResource;
 
 public function panel(Panel $panel): Panel
 {
@@ -262,4 +262,4 @@ MIT License. See LICENSE file for details.
 
 ## Credits
 
-Developed by Molham Team
+Developed by Badr Shs

@@ -15,14 +15,14 @@ Since this is a local package, add it to your root `composer.json`:
         }
     ],
     "require": {
-        "molham/laravel-dynamic-image-composer": "@dev"
+    "badrshs/laravel-dynamic-image-composer": "@dev"
     }
 }
 ```
 
 Then run:
 ```bash
-composer update molham/laravel-dynamic-image-composer
+composer update badrshs/laravel-dynamic-image-composer
 ```
 
 ### 2. Publish assets
@@ -47,7 +47,7 @@ $image = $service->generateCertificate($data, 'default', $customConfig);
 
 **After:**
 ```php
-use Molham\DynamicImageComposer\DynamicImageComposer;
+use Badrshs\DynamicImageComposer\DynamicImageComposer;
 
 $composer = new DynamicImageComposer();
 $image = $composer->generate(
@@ -72,7 +72,7 @@ $image = $composer->generate(
 You can keep using your `Certification` model and just change the image generation:
 
 ```php
-use Molham\DynamicImageComposer\Services\TemplateImageService;
+use Badrshs\DynamicImageComposer\Services\TemplateImageService;
 
 class CertificationController extends Controller
 {
@@ -95,7 +95,7 @@ class CertificationController extends Controller
 Add to your Filament Admin Panel in `app/Providers/Filament/AdminPanelProvider.php`:
 
 ```php
-use Molham\DynamicImageComposer\Filament\Resources\ImageTemplateResource;
+use Badrshs\DynamicImageComposer\Filament\Resources\ImageTemplateResource;
 
 public function panel(Panel $panel): Panel
 {
@@ -112,7 +112,7 @@ public function panel(Panel $panel): Panel
 
 ```php
 // routes/web.php
-use Molham\DynamicImageComposer\DynamicImageComposer;
+use Badrshs\DynamicImageComposer\DynamicImageComposer;
 
 Route::get('/generate-certificate/{certification}', function (Certification $certification) {
     $composer = app(DynamicImageComposer::class);

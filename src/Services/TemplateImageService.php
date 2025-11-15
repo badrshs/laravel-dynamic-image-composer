@@ -1,9 +1,9 @@
 <?php
 
-namespace Molham\DynamicImageComposer\Services;
+namespace Badrshs\DynamicImageComposer\Services;
 
-use Molham\DynamicImageComposer\DynamicImageComposer;
-use Molham\DynamicImageComposer\Models\ImageTemplate;
+use Badrshs\DynamicImageComposer\DynamicImageComposer;
+use Badrshs\DynamicImageComposer\Models\ImageTemplate;
 use Illuminate\Support\Facades\Log;
 
 /**

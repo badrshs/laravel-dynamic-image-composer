@@ -1,9 +1,9 @@
 <?php
 
-namespace Molham\DynamicImageComposer\Filament\Resources\ImageTemplateResource\Pages;
+namespace Badrshs\DynamicImageComposer\Filament\Resources\ImageTemplateResource\Pages;
 
 use Filament\Resources\Pages\ListRecords;
-use Molham\DynamicImageComposer\Filament\Resources\ImageTemplateResource;
+use Badrshs\DynamicImageComposer\Filament\Resources\ImageTemplateResource;
 
 class ListImageTemplates extends ListRecords
 {

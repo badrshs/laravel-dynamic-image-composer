@@ -1,5 +1,5 @@
 {
-    "name": "molham/laravel-dynamic-image-composer",
+    "name": "badrshs/laravel-dynamic-image-composer",
     "description": "Compose images dynamically from templates with text and image overlays",
     "keywords": [
         "laravel",
@@ -14,8 +14,8 @@
     "license": "MIT",
     "authors": [
         {
-            "name": "Molham Team",
-            "email": "dev@molham.com"
+            "name": "Badr Shs",
+            "email": "dev@badrshs.com"
         }
     ],
     "require": {
@@ -34,18 +34,18 @@
     },
     "autoload": {
         "psr-4": {
-            "Molham\\DynamicImageComposer\\": "src/"
+            "Badrshs\\DynamicImageComposer\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Molham\\DynamicImageComposer\\Tests\\": "tests/"
+            "Badrshs\\DynamicImageComposer\\Tests\\": "tests/"
         }
     },
     "extra": {
         "laravel": {
             "providers": [
-                "Molham\\DynamicImageComposer\\DynamicImageComposerServiceProvider"
+                "Badrshs\\DynamicImageComposer\\DynamicImageComposerServiceProvider"
             ]
         }
     },
