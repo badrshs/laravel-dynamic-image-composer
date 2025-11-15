@@ -343,39 +343,43 @@ class DynamicImageComposer
      */
     protected function getFontPath(string $fontFile): string
     {
+        $fontsStorage = config('dynamic-image-composer.fonts_storage', 'storage');
         $fontsDir = config('dynamic-image-composer.fonts_directory', 'fonts');
 
-        // Try storage first
-        if (Storage::exists("{$fontsDir}/{$fontFile}")) {
-            $tempPath = tempnam(sys_get_temp_dir(), 'font_');
-            file_put_contents($tempPath, Storage::get("{$fontsDir}/{$fontFile}"));
-
-            register_shutdown_function(function () use ($tempPath) {
-                if (file_exists($tempPath)) {
-                    @unlink($tempPath);
-                }
-            });
-
-            return $tempPath;
+        // Determine base path based on storage type
+        if ($fontsStorage === 'storage') {
+            $basePath = Storage::disk('public')->path($fontsDir);
+        } else {
+            $basePath = public_path($fontsDir);
         }
 
-        // Fall back to public directory
-        $publicPath = public_path("{$fontsDir}/{$fontFile}");
-        if (file_exists($publicPath)) {
-            return $publicPath;
+        $fontPath = $basePath . DIRECTORY_SEPARATOR . $fontFile;
+
+        // Check if font exists
+        if (file_exists($fontPath)) {
+            return $fontPath;
         }
 
-        Log::warning("Font file not found: {$fontFile}");
-        return $this->getDefaultFont('en');
-    }
+        // Try alternative locations
+        $alternatives = [
+            Storage::disk('public')->path($fontsDir . '/' . $fontFile),
+            public_path($fontsDir . '/' . $fontFile),
+            storage_path('app/public/fonts/' . $fontFile),
+            public_path('fonts/' . $fontFile),
+        ];
 
-    /**
-     * Get default system font
-     */
-    protected function getDefaultFont(string $lang): string
-    {
-        // Return a basic font path - you might need to adjust this
-        return public_path('fonts/Museo500-Regular.ttf');
+        foreach ($alternatives as $altPath) {
+            if (file_exists($altPath)) {
+                return $altPath;
+            }
+        }
+
+        Log::warning("Font file not found: {$fontFile}", [
+            'searched_paths' => array_merge([$fontPath], $alternatives)
+        ]);
+
+        // Return the first path anyway - will cause error but at least we tried
+        return $fontPath;
     }
 
     /**

@@ -46,9 +46,13 @@ return [
     | Fonts Directory
     |--------------------------------------------------------------------------
     |
-    | Directory where custom fonts are stored (relative to public path)
+    | Directory where custom fonts are stored. Can be:
+    | - 'storage' (uses storage_path('app/public/fonts'))
+    | - 'public' (uses public_path('fonts'))
     |
     */
+    'fonts_storage' => env('DYNAMIC_IMAGE_FONTS_STORAGE', 'storage'), // 'storage' or 'public'
+    
     'fonts_directory' => 'fonts',
 
     /*
@@ -57,20 +61,21 @@ return [
     |--------------------------------------------------------------------------
     |
     | Define font families with language-specific variants
+    | Uses fonts from the configured fonts_directory
     |
     */
     'fonts' => [
         'default' => [
-            'en' => 'Museo500-Regular.ttf',
-            'ar' => 'sky.ttf',
+            'en' => 'Roboto-Regular.ttf',
+            'ar' => 'NotoKufiArabic-Regular.ttf',
         ],
         'libre' => [
-            'en' => 'AbhayaLibre-Regular.ttf',
-            'ar' => 'sky.ttf',
+            'en' => 'Roboto-Regular.ttf',
+            'ar' => 'NotoKufiArabic-Regular.ttf',
         ],
         'monotype' => [
-            'en' => 'monotype.ttf',
-            'ar' => 'sky.ttf',
+            'en' => 'Roboto-Regular.ttf',
+            'ar' => 'NotoKufiArabic-Regular.ttf',
         ],
     ],
 

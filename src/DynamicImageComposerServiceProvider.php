@@ -36,6 +36,13 @@ class DynamicImageComposerServiceProvider extends ServiceProvider
         // Load migrations
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
 
+        // Register commands
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                \Badrshs\DynamicImageComposer\Console\Commands\InstallCommand::class,
+            ]);
+        }
+
         // Publish config
         $this->publishes([
             __DIR__ . '/../config/dynamic-image-composer.php' => config_path('dynamic-image-composer.php'),
@@ -50,5 +57,10 @@ class DynamicImageComposerServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__ . '/../resources/views' => resource_path('views/vendor/dynamic-image-composer'),
         ], 'dynamic-image-composer-views');
+
+        // Publish fonts
+        $this->publishes([
+            __DIR__ . '/../resources/fonts' => storage_path('app/public/fonts'),
+        ], 'dynamic-image-composer-fonts');
     }
 }

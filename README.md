@@ -22,13 +22,34 @@ Install via Composer:
 composer require badrshs/laravel-dynamic-image-composer
 ```
 
-Publish configuration and migrations:
+### Quick Install (Recommended)
+
+Run the install command which will publish config, migrations, views, and optionally fonts:
+
+```bash
+php artisan dynamic-image-composer:install --with-fonts
+```
+
+This command will:
+- ✅ Publish configuration file
+- ✅ Publish migrations
+- ✅ Publish views
+- ✅ Publish default fonts (with --with-fonts flag)
+- ✅ Create necessary directories
+- ✅ Run migrations (with confirmation)
+- ✅ Create storage link
+
+### Manual Installation
+
+If you prefer manual installation:
 
 ```bash
 php artisan vendor:publish --tag=dynamic-image-composer-config
 php artisan vendor:publish --tag=dynamic-image-composer-migrations
 php artisan vendor:publish --tag=dynamic-image-composer-views
+php artisan vendor:publish --tag=dynamic-image-composer-fonts
 php artisan migrate
+php artisan storage:link
 ```
 
 ## Quick Start
@@ -303,8 +324,9 @@ $image = $composer->generate('template.png', [
 ## Requirements
 
 - PHP 8.1 or higher
-- Laravel 10.x or 11.x
+- Laravel 10.x, 11.x, or 12.x
 - GD Library (enabled by default in most PHP installations)
+- Default fonts included (Roboto for English, Noto Kufi Arabic for Arabic)
 
 ## License
 
