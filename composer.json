@@ -23,7 +23,7 @@
         "illuminate/support": "^10.0|^11.0|^12.0",
         "illuminate/database": "^10.0|^11.0|^12.0",
         "ext-gd": "*",
-        "arphp/laravel-arabic": "^4.0"
+        "khaled.alshamaa/ar-php": "^6.3"
     },
     "require-dev": {
         "orchestra/testbench": "^8.0|^9.0|^10.0",
