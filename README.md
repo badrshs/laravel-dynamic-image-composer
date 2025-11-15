@@ -4,7 +4,8 @@ Compose images dynamically from templates with text and image overlays. Perfect 
 
 ## Features
 
-- 🎨 Dynamic text overlays with custom fonts, colors, and positioning
+- 🎨 **Visual Designer Interface** - Drag-and-drop template designer with live preview
+- 📝 Dynamic text overlays with custom fonts, colors, and positioning
 - 🖼️ Image overlay support with opacity and positioning
 - 🌍 Multi-language support (Arabic, English, and more)
 - 📐 Flexible positioning (left, center, right alignment)
@@ -26,10 +27,31 @@ Publish configuration and migrations:
 ```bash
 php artisan vendor:publish --tag=dynamic-image-composer-config
 php artisan vendor:publish --tag=dynamic-image-composer-migrations
+php artisan vendor:publish --tag=dynamic-image-composer-views
 php artisan migrate
 ```
 
 ## Quick Start
+
+### Visual Designer Interface
+
+The package includes a complete **drag-and-drop visual designer** for creating and editing templates:
+
+1. Create a template via Filament or directly in the database
+2. Click the **"Designer"** button on any template
+3. Upload image elements (logos, stamps, decorations)
+4. Drag and position elements on the canvas
+5. Add text fields with positioning and styling
+6. Preview your design in real-time
+7. Generate the final composite image
+
+**Accessing the Designer:**
+
+```php
+// From Filament: Click "Designer" button on any template
+// Or directly via route:
+route('image-template.designer', ['template' => $templateId])
+```
 
 ### Basic Usage
 
@@ -196,7 +218,35 @@ public function panel(Panel $panel): Panel
 }
 ```
 
-This provides a full admin interface for managing templates and elements.
+This provides a full admin interface for managing templates and elements, including:
+- Template CRUD operations
+- Visual designer interface
+- Element management
+- Live preview generation
+
+## Displaying Generated Images
+
+Use the included Blade component to display generated images in a grid:
+
+```blade
+<x-dynamic-image-composer::generated-images-grid 
+    :images="$generatedImages"
+    itemLabel="Certificate"
+/>
+```
+
+Where `$generatedImages` is an array of:
+```php
+[
+    [
+        'url' => 'https://...',
+        'name' => 'John Doe',
+        'filename' => 'certificate.png',
+        'metadata' => 'Generated on 2024-01-01' // optional
+    ],
+    // ...
+]
+```
 
 ## Advanced Usage
 

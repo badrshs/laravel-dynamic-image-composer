@@ -27,16 +27,28 @@ class DynamicImageComposerServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Load views
+        $this->loadViewsFrom(__DIR__ . '/../resources/views', 'dynamic-image-composer');
+
+        // Load routes
+        $this->loadRoutesFrom(__DIR__ . '/../routes/web.php');
+
+        // Load migrations
+        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
+
+        // Publish config
         $this->publishes([
             __DIR__ . '/../config/dynamic-image-composer.php' => config_path('dynamic-image-composer.php'),
         ], 'dynamic-image-composer-config');
 
+        // Publish migrations
         $this->publishes([
             __DIR__ . '/../database/migrations' => database_path('migrations'),
         ], 'dynamic-image-composer-migrations');
 
-        if ($this->app->runningInConsole()) {
-            $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
-        }
+        // Publish views
+        $this->publishes([
+            __DIR__ . '/../resources/views' => resource_path('views/vendor/dynamic-image-composer'),
+        ], 'dynamic-image-composer-views');
     }
 }

@@ -107,6 +107,11 @@ class ImageTemplateResource extends Resource
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
+                Tables\Actions\Action::make('designer')
+                    ->label('Designer')
+                    ->icon('heroicon-o-paint-brush')
+                    ->url(fn($record): string => route('image-template.designer', ['template' => $record]))
+                    ->openUrlInNewTab(),
                 Tables\Actions\DeleteAction::make(),
             ])
             ->bulkActions([

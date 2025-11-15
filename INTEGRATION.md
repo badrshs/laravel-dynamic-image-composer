@@ -15,7 +15,7 @@ Since this is a local package, add it to your root `composer.json`:
         }
     ],
     "require": {
-    "badrshs/laravel-dynamic-image-composer": "@dev"
+        "badrshs/laravel-dynamic-image-composer": "@dev"
     }
 }
 ```
@@ -30,41 +30,79 @@ composer update badrshs/laravel-dynamic-image-composer
 ```bash
 php artisan vendor:publish --tag=dynamic-image-composer-config
 php artisan vendor:publish --tag=dynamic-image-composer-migrations
+php artisan vendor:publish --tag=dynamic-image-composer-views
 php artisan migrate
 ```
 
-### 3. Migrating from CertificationService
+### 3. Configure your fonts and colors
 
-Replace your existing certification generation with the new package:
+Edit `config/dynamic-image-composer.php`:
 
-**Before:**
+```php
+'fonts' => [
+    'default' => [
+        'en' => 'Museo500-Regular.ttf',
+        'ar' => 'sky.ttf',
+    ],
+    'monotype' => [
+        'en' => 'monotype.ttf',
+        'ar' => 'sky.ttf',
+    ],
+    // Add your custom fonts...
+],
+
+'colors' => [
+    'black' => [40, 40, 40],
+    'brown' => [170, 135, 77],
+    'gold' => [212, 175, 55],
+    // Add your custom colors...
+],
+```
+
+### 4. The Visual Designer (Core Feature!)
+
+The package includes a complete **drag-and-drop designer interface**. This is the core of the package:
+
+**Access the designer:**
+- Via Filament: Click the "Designer" button on any template
+- Direct URL: `/image-template/{templateId}/designer`
+
+**Features:**
+- Drag and drop image elements
+- Position text fields visually
+- Live preview generation
+- Real-time configuration updates
+- Upload new elements directly from the interface
+
+### 5. Migrating from Your Existing CertificationService
+
+**Before (Old Code):**
 ```php
 use App\Services\CertificationImageGeneratorService;
+use App\Services\AdvancedCertificationService;
 
+// Your old service with hardcoded configurations
 $service = new CertificationImageGeneratorService($decodeService);
 $image = $service->generateCertificate($data, 'default', $customConfig);
 ```
 
-**After:**
+**After (New Package):**
 ```php
-use Badrshs\DynamicImageComposer\DynamicImageComposer;
+use Badrshs\DynamicImageComposer\Services\TemplateImageService;
+use Badrshs\DynamicImageComposer\Models\ImageTemplate;
 
-$composer = new DynamicImageComposer();
-$image = $composer->generate(
-    $templatePath,
-    [
-        'name' => [
-            'value' => $data['name'],
-            'x' => 'center',
-            'y' => 1450,
-            'fontSize' => 175,
-            'color' => 'brown',
-            'alignment' => 'center',
-            'font' => 'monotype',
-        ],
-        // ... other fields
-    ]
-);
+// Use template from database
+$template = ImageTemplate::where('is_active', true)->first();
+
+$service = app(TemplateImageService::class);
+$image = $service->generateAndOutput($template, [
+    'name' => $certification->fullName,
+    'course' => $certification->course->title,
+    'date' => $certification->date->format('Y-m-d'),
+    'code' => $certification->code,
+], 'certificate.png');
+
+return $image; // Returns HTTP response
 ```
 
 ### 4. Using with Existing Models
@@ -73,22 +111,68 @@ You can keep using your `Certification` model and just change the image generati
 
 ```php
 use Badrshs\DynamicImageComposer\Services\TemplateImageService;
+use Badrshs\DynamicImageComposer\Models\ImageTemplate;
 
 class CertificationController extends Controller
 {
-    public function generateImage(Certification $certification, TemplateImageService $service)
+    public function showCertificate(string $code, TemplateImageService $service)
     {
-        $template = ImageTemplate::find($certification->template_id);
+        $certification = Certification::where('code', $code)->firstOrFail();
+        
+        // Get the template (or use a default one)
+        $template = ImageTemplate::find($certification->template_id) 
+            ?? ImageTemplate::where('is_active', true)->first();
         
         return $service->generateAndOutput($template, [
             'name' => $certification->firstName . ' ' . $certification->surname,
             'course' => $certification->course->title,
-            'date' => $certification->date,
+            'date' => $certification->date->format('F d, Y'),
             'code' => $certification->code,
-        ], 'certificate.png');
+        ], "certificate-{$code}.png");
+    }
+    
+    public function generateForGroup(int $groupId, TemplateImageService $service)
+    {
+        $certifications = Certification::where('group_id', $groupId)->get();
+        $template = ImageTemplate::where('is_active', true)->first();
+        
+        $generatedImages = [];
+        
+        foreach ($certifications as $cert) {
+            $result = $service->generateAndSave($template, [
+                'name' => $cert->fullName,
+                'course' => $cert->course->title,
+                'date' => $cert->date->format('F d, Y'),
+                'code' => $cert->code,
+            ], "cert-{$cert->code}.png");
+            
+            $generatedImages[] = [
+                'url' => $result['url'],
+                'name' => $cert->fullName,
+                'filename' => $result['filename'],
+                'metadata' => $cert->date->format('Y-m-d'),
+            ];
+        }
+        
+        // Display using the component
+        return view('certifications.batch', compact('generatedImages'));
     }
 }
 ```
+
+### 5. Displaying Generated Images
+
+In your Blade views, use the included component:
+
+```blade
+{{-- resources/views/certifications/batch.blade.php --}}
+<x-dynamic-image-composer::generated-images-grid 
+    :images="$generatedImages"
+    itemLabel="Certificate"
+/>
+```
+
+Or create your own custom view based on the component.
 
 ### 5. Filament Integration (Optional)
 
@@ -108,33 +192,37 @@ public function panel(Panel $panel): Panel
 }
 ```
 
+This gives you:
+- Full template CRUD
+- Visual designer interface (the core feature!)
+- Element management
+- Live preview
+
 ### 6. Route Examples
 
-```php
-// routes/web.php
-use Badrshs\DynamicImageComposer\DynamicImageComposer;
+The package automatically registers routes for the designer:
 
-Route::get('/generate-certificate/{certification}', function (Certification $certification) {
-    $composer = app(DynamicImageComposer::class);
-    
-    $image = $composer->generate(
-        $certification->template->background_image,
-        [
-            'name' => [
-                'value' => $certification->fullName,
-                'x' => 'center',
-                'y' => 1200,
-                'fontSize' => 100,
-                'color' => 'brown',
-                'alignment' => 'center',
-                'font' => 'monotype',
-            ]
-        ]
-    );
-    
-    return $composer->output($image, "certificate-{$certification->code}.png");
-});
-```
+- `/image-template/{id}/designer` - Visual designer interface
+- `/image-template/{id}/preview` - Live preview generation
+- `/image-template/{id}/elements` - Upload elements
+- `/image-template/{id}/save-configuration` - Save layout
+- `/image-template/{id}/generate` - Generate final image
+
+You can use these in your own controllers or Filament actions.
+
+### 7. Migration Checklist
+
+- [ ] Install package via composer
+- [ ] Publish config, migrations, and views
+- [ ] Run migrations
+- [ ] Copy fonts to `public/fonts/`
+- [ ] Configure fonts and colors in config
+- [ ] Create templates via Filament or database
+- [ ] Use the visual designer to layout elements
+- [ ] Update controllers to use `TemplateImageService`
+- [ ] Replace old service calls with new package
+- [ ] Test generation with sample data
+- [ ] Update routes if using custom URLs
 
 ## Benefits of the Package
 
