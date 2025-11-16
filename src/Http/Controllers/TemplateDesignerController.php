@@ -407,10 +407,10 @@ class TemplateDesignerController
         }
 
         $text = (string) $config['value'];
-
+        
         // Check if text is Arabic
         $isArabic = preg_match('/\p{Arabic}/u', $text) === 1;
-
+        
         if ($isArabic) {
             $arabic = new \ArPHP\I18N\Arabic();
             $text = $arabic->utf8Glyphs($text);
@@ -421,7 +421,9 @@ class TemplateDesignerController
         $langKey = $isArabic ? 'ar' : 'en';
         $fonts = config('dynamic-image-composer.fonts', []);
         $fontFile = $fonts[$fontStyle][$langKey] ?? $fonts['default'][$langKey] ?? 'Museo500-Regular.ttf';
-        $fontPath = public_path('fonts/' . $fontFile);
+        
+        // Try multiple font locations
+        $fontPath = $this->findFontPath($fontFile);
 
         // Get color
         $colorKey = $config['color'] ?? 'black';
@@ -435,26 +437,57 @@ class TemplateDesignerController
         // Calculate X position based on alignment
         $x = $config['x'] ?? 0;
         $alignment = $config['alignment'] ?? 'left';
+        
+        if ($fontPath && file_exists($fontPath)) {
+            if ($x === 'center' || $alignment === 'center') {
+                $box = imagettfbbox($fontSize, 0, $fontPath, $text);
+                $textWidth = $box[2] - $box[0];
+                $x = ($imageWidth - $textWidth) / 2;
+            } elseif ($alignment === 'right') {
+                $box = imagettfbbox($fontSize, 0, $fontPath, $text);
+                $textWidth = $box[2] - $box[0];
+                $x = $imageWidth - $textWidth - ($x ?? 0);
+            }
 
-        if ($x === 'center' || $alignment === 'center') {
-            $box = imagettfbbox($fontSize, 0, $fontPath, $text);
-            $textWidth = $box[2] - $box[0];
-            $x = ($imageWidth - $textWidth) / 2;
-        } elseif ($alignment === 'right') {
-            $box = imagettfbbox($fontSize, 0, $fontPath, $text);
-            $textWidth = $box[2] - $box[0];
-            $x = $imageWidth - $textWidth - ($x ?? 0);
-        }
+            $y = $config['y'] ?? 0;
 
-        $y = $config['y'] ?? 0;
-
-        // Add text
-        if (file_exists($fontPath)) {
+            // Add text
             imagettftext($image, $fontSize, 0, $x, $y, $color, $fontPath, $text);
+        } else {
+            Log::warning('Font not found for text rendering', [
+                'font_file' => $fontFile,
+                'tried_path' => $fontPath
+            ]);
         }
     }
 
     /**
+     * Find font path in multiple locations
+     */
+    protected function findFontPath(string $fontFile): ?string
+    {
+        $fontsDir = config('dynamic-image-composer.fonts_directory', 'fonts');
+        
+        // Try storage/app/public/fonts
+        $storagePath = storage_path("app/public/{$fontsDir}/{$fontFile}");
+        if (file_exists($storagePath)) {
+            return $storagePath;
+        }
+
+        // Try public/fonts
+        $publicPath = public_path("{$fontsDir}/{$fontFile}");
+        if (file_exists($publicPath)) {
+            return $publicPath;
+        }
+
+        // Try via Storage facade
+        $disk = config('dynamic-image-composer.disk', 'public');
+        if (\Illuminate\Support\Facades\Storage::disk($disk)->exists("{$fontsDir}/{$fontFile}")) {
+            return \Illuminate\Support\Facades\Storage::disk($disk)->path("{$fontsDir}/{$fontFile}");
+        }
+
+        return null;
+    }    /**
      * Create image from file
      */
     protected function createImageFromFile(string $path)

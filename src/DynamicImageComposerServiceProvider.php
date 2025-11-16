@@ -23,6 +23,11 @@ class DynamicImageComposerServiceProvider extends ServiceProvider
         $this->app->singleton(TemplateImageService::class, function ($app) {
             return new TemplateImageService($app->make(DynamicImageComposer::class));
         });
+
+        // Register commands
+        $this->commands([
+            \Badrshs\DynamicImageComposer\Console\Commands\InstallCommand::class,
+        ]);
     }
 
     public function boot(): void
