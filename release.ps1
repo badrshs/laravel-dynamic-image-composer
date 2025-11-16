@@ -38,11 +38,10 @@ Write-Host ""
 git status --short
 
 Write-Host ""
-$commitMsg = Read-Host "Enter commit message"
+$commitMsg = Read-Host "Enter commit message [Release $nextTag]"
 
 if ([string]::IsNullOrWhiteSpace($commitMsg)) {
-    Write-Host "Error: Commit message cannot be empty!" -ForegroundColor Red
-    exit 1
+    $commitMsg = "Release $nextTag"
 }
 
 Write-Host ""
