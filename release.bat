@@ -19,14 +19,14 @@ if %errorlevel% equ 0 (
     set LAST_TAG=v1.0.0
     set NEXT_TAG=v1.0.0
 ) else (
-    echo Last tag: %LAST_TAG%
+    echo Last tag: !LAST_TAG!
     echo.
 
     REM Extract version numbers (remove 'v' prefix)
-    set VERSION=%LAST_TAG:v=%
+    set VERSION=!LAST_TAG:v=!
 
     REM Split version into parts
-    for /f "tokens=1,2,3 delims=." %%a in ("%VERSION%") do (
+    for /f "tokens=1,2,3 delims=." %%a in ("!VERSION!") do (
         set MAJOR=%%a
         set MINOR=%%b
         set PATCH=%%c
