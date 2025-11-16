@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.1.0] - 2024-11-15
+## [1.1.2] - 2024-11-15
 
 ### Added
 - **Visual Designer Interface** - Complete drag-and-drop template designer
