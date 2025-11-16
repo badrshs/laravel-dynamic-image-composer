@@ -20,6 +20,23 @@
         })
         ->values()
         ->all();
+    
+    // Transform field configuration for the designer
+    $fieldConfiguration = collect($template->field_configuration['fields'] ?? [])
+        ->map(function ($config, $key) {
+            return [
+                'key' => $key,
+                'centerX' => $config['centerX'] ?? false,
+                'x' => $config['x'] ?? 0,
+                'y' => $config['y'] ?? 0,
+                'fontSize' => $config['fontSize'] ?? 64,
+                'color' => $config['color'] ?? 'black',
+                'alignment' => $config['alignment'] ?? 'center',
+                'font' => $config['font'] ?? 'default',
+            ];
+        })
+        ->values()
+        ->all();
 @endphp
 <!DOCTYPE html>
 <html lang="en">
@@ -43,7 +60,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
 
     <style>
-        .certificate-canvas {
+        .template-canvas {
             position: relative;
             overflow: hidden;
             background: #f8f9fa;
@@ -172,15 +189,21 @@
             <div class="flex items-center gap-4">
                 <h1 class="text-lg sm:text-xl font-semibold truncate">{{ $template->name }} — Designer</h1>
                 <div class="hidden sm:flex items-center gap-1">
-                    <span class="text-sm text-gray-500">@{{ tpl.width }} × @{{ tpl.height }}px</span>
+                    <button @click="zoomOut" class="p-2 rounded hover:bg-gray-100" title="Zoom out"><i
+                            class="fa-solid fa-magnifying-glass-minus"></i></button>
+                    <span class="text-sm w-12 text-center">@{{ Math.round(scale * 100) }}%</span>
+                    <button @click="zoomIn" class="p-2 rounded hover:bg-gray-100" title="Zoom in"><i
+                            class="fa-solid fa-magnifying-glass-plus"></i></button>
+                    <button @click="resetZoom"
+                        class="px-3 py-1.5 rounded bg-gray-200 hover:bg-gray-300 text-sm">Reset</button>
                 </div>
             </div>
             <div class="flex items-center gap-2">
                 <button @click="preview" class="px-3 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700">
-                    <i class="fa-regular fa-eye mr-1"></i> Preview
+                    <i class="fa-solid fa-eye mr-2"></i> Preview
                 </button>
                 <button @click="generate" class="px-3 py-2 rounded bg-green-600 text-white hover:bg-green-700">
-                    <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Generate
+                    <i class="fa-solid fa-download mr-2"></i> Generate
                 </button>
             </div>
         </div>
@@ -189,36 +212,32 @@
         <div class="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-0">
             <!-- Canvas area -->
             <div class="p-4 sm:p-8 overflow-auto scrollbars">
-                <div ref="canvas" class="certificate-canvas drop-zone mx-auto" :style="canvasStyle"
-                    @dragover="onDragOver" @dragleave="e => e.currentTarget.classList.remove('drag-over')"
-                    @drop="onDrop">
-
-                    <!-- Background -->
-                    <img v-if="tpl.background_image" :src="backgroundImageUrl" @load="onBgLoaded" alt="Background"
-                        class="bg" />
+                <div ref="canvas" class="template-canvas drop-zone mx-auto" :style="canvasStyle"
+                    @click="clearSelections" @dragenter.prevent @dragover.prevent="onDragOver"
+                    @dragleave.prevent="onDragLeave" @drop.prevent="onDrop">
+                    <!-- Background image drives exact pixel size & onload natural size -->
+                    <img class="bg" :src="storageBase + '/' + template.background_image" alt="Template background"
+                        @load="onBgLoaded" />
 
                     <!-- Elements (images) -->
-                    <div v-for="el in elements" :key="'el-' + el.id"
-                        :class="['template-element', { 'is-selected': el.id === selectedId }]" :style="elementStyle(el)"
-                        @mousedown="handleElementMouseDown(el.id, $event)"
-                        @touchstart="handleElementMouseDown(el.id, $event)">
-                        <img v-if="el.image_path" :src="getImageUrl(el.image_path)" :alt="el.name" />
-                        <div v-if="el.id === selectedId" class="resize-handle"></div>
+                    <div v-for="el in elements" :key="el.id" :id="'el-' + el.id" class="template-element"
+                        :class="{ 'is-selected': selectedId === el.id }" :style="elementStyle(el)"
+                        @mousedown="handleElementMouseDown(el.id, $event)">
+                        <img :src="storageBase + '/' + el.image_path" :alt="el.name" draggable="false" />
+                        <div v-if="selectedId===el.id" class="resize-handle"></div>
                     </div>
 
-                    <!-- Fields (text placeholders) -->
-                    <div v-for="(field, index) in fields" :key="'field-' + index"
-                        :class="['field-marker', { 'is-selected': index === selectedFieldIndex }]"
-                        :style="fieldMarkerStyle(field)" @mousedown="handleFieldMouseDown(index, $event)"
-                        @touchstart="handleFieldMouseDown(index, $event)">
-                        <span class="dot"></span>@{{ field.label }}
+                    <!-- Placeholder field markers (draggable) -->
+                    <div v-for="(f, i) in fields" :key="'field-' + i" :id="'field-' + i" class="field-marker"
+                        :class="{ 'is-selected': selectedFieldIndex === i }" :style="fieldStyle(f)"
+                        @mousedown="handleFieldMouseDown(i, $event)">
+                        <span class="dot"></span>@{{ f.key }}
                     </div>
                 </div>
 
                 <p class="mt-4 text-center text-gray-500 text-sm">
-                    Drag elements and field markers on the canvas. Use the sidebar to adjust properties. <br />
-                    Click <strong>Preview</strong> to see a live preview, or <strong>Generate</strong> to save the final
-                    composition.
+                    Tip: drag & drop images onto the canvas, drag field markers to position them, use <kbd>Delete</kbd>
+                    to remove elements, and arrow keys for nudging.
                 </p>
             </div>
 
@@ -227,35 +246,54 @@
 
                 <!-- Live Preview -->
                 <section>
-                    <h3 class="text-sm font-semibold text-gray-900 mb-3">Live Preview</h3>
-                    <div class="relative bg-gray-50 border border-gray-200 rounded overflow-hidden"
-                        style="aspect-ratio: 3 / 4;">
-                        <img v-if="previewImage" :src="previewImage" alt="Preview"
-                            class="w-full h-full object-contain" />
-                        <div v-else class="absolute inset-0 flex items-center justify-center">
-                            <p class="text-gray-400 text-sm">Click Preview to see result</p>
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="font-semibold">Live Preview</h3>
+                        <span v-if="previewLoading" class="text-xs text-gray-500 flex items-center gap-2">
+                            <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                    stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                </path>
+                            </svg>
+                            Updating…
+                        </span>
+                    </div>
+                    <div class="border rounded overflow-hidden bg-gray-50">
+                        <div class="w-full" style="aspect-ratio: 16 / 10;">
+                            <img v-if="previewUrl" :src="previewUrl" alt="Live preview"
+                                class="w-full h-full object-contain" @load="onPreviewLoaded"
+                                @error="onPreviewError" />
+                            <div v-else
+                                class="w-full h-full flex items-center justify-center text-gray-400 text-sm">
+                                Preview will appear here
+                            </div>
                         </div>
                     </div>
-                    <button @click="preview"
-                        class="mt-2 w-full px-3 py-2 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700">
-                        <i class="fa-solid fa-arrows-rotate mr-1"></i>
-                        Refresh Preview
-                    </button>
+                    <p class="text-xs text-gray-500 mt-2">Updates automatically. Uses sample data.</p>
                 </section>
 
                 <!-- Elements list -->
                 <section>
-                    <h3 class="text-sm font-semibold text-gray-900 mb-3">Elements (@{{ elements.length }})</h3>
-                    <div class="space-y-2">
-                        <div v-for="el in elements" :key="'list-' + el.id" @click="select(el.id)"
-                            :class="['flex items-center gap-3 p-2 rounded border-2 cursor-pointer', el.id === selectedId ?
-                                'border-blue-500 bg-blue-50' : 'border-gray-200'
-                            ]">
-                            <img v-if="el.image_path" :src="getImageUrl(el.image_path)" :alt="el.name"
+                    <h3 class="font-semibold mb-3">Elements</h3>
+                    <div v-if="!elements.length" class="text-gray-500 text-sm">No elements yet.</div>
+                    <div v-else class="space-y-2">
+                        <div v-for="el in elements" :key="'list-' + el.id"
+                            class="flex items-center gap-2 p-2 rounded border cursor-pointer"
+                            :class="selectedId === el.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'"
+                            @click="select(el.id)">
+                            <img :src="storageBase + '/' + el.image_path" :alt="el.name"
                                 class="w-10 h-10 object-contain rounded" />
                             <span class="flex-1 text-sm truncate">@{{ el.name }}</span>
-                            <button @click.stop="removeElement(el.id)" class="text-red-600 hover:text-red-800">
-                                <i class="fa-solid fa-trash"></i>
+                            <button @click.stop="zUp(el)" class="text-gray-600 hover:text-blue-600" title="Bring forward">
+                                <i class="fa-solid fa-arrow-up text-xs"></i>
+                            </button>
+                            <button @click.stop="zDown(el)" class="text-gray-600 hover:text-blue-600" title="Send backward">
+                                <i class="fa-solid fa-arrow-down text-xs"></i>
+                            </button>
+                            <button @click.stop="remove(el)" class="text-red-600 hover:text-red-800" title="Delete">
+                                <i class="fa-solid fa-trash text-xs"></i>
                             </button>
                         </div>
                     </div>
@@ -263,123 +301,132 @@
 
                 <!-- Properties of selected element -->
                 <section v-if="current" class="space-y-3">
-                    <h3 class="text-sm font-semibold text-gray-900">Properties: @{{ current.name }}</h3>
+                    <h3 class="font-semibold">Properties</h3>
+
                     <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <label class="block text-xs text-gray-600 mb-1">X</label>
-                            <input v-model.number="current.x_position" type="number"
-                                class="w-full px-2 py-1 text-sm border rounded" />
-                        </div>
-                        <div>
-                            <label class="block text-xs text-gray-600 mb-1">Y</label>
-                            <input v-model.number="current.y_position" type="number"
-                                class="w-full px-2 py-1 text-sm border rounded" />
-                        </div>
-                        <div>
-                            <label class="block text-xs text-gray-600 mb-1">Width</label>
-                            <input v-model.number="current.width" type="number"
-                                class="w-full px-2 py-1 text-sm border rounded" />
-                        </div>
-                        <div>
-                            <label class="block text-xs text-gray-600 mb-1">Height</label>
-                            <input v-model.number="current.height" type="number"
-                                class="w-full px-2 py-1 text-sm border rounded" />
-                        </div>
-                        <div>
-                            <label class="block text-xs text-gray-600 mb-1">Opacity</label>
-                            <input v-model.number="current.opacity" type="number" min="0" max="1"
-                                step="0.1" class="w-full px-2 py-1 text-sm border rounded" />
-                        </div>
-                        <div>
-                            <label class="block text-xs text-gray-600 mb-1">Z-index</label>
-                            <input v-model.number="current.z_index" type="number"
-                                class="w-full px-2 py-1 text-sm border rounded" />
-                        </div>
+                        <label class="text-xs text-gray-500">X
+                            <input type="number" class="mt-1 w-full border rounded px-2 py-1"
+                                v-model.number="current.x_position" @input="persist(current)" />
+                        </label>
+                        <label class="text-xs text-gray-500">Y
+                            <input type="number" class="mt-1 w-full border rounded px-2 py-1"
+                                v-model.number="current.y_position" @input="persist(current)" />
+                        </label>
+                        <label class="text-xs text-gray-500">Width
+                            <input type="number" class="mt-1 w-full border rounded px-2 py-1"
+                                v-model.number="current.width" @input="persist(current)" />
+                        </label>
+                        <label class="text-xs text-gray-500">Height
+                            <input type="number" class="mt-1 w-full border rounded px-2 py-1"
+                                v-model.number="current.height" @input="persist(current)" />
+                        </label>
                     </div>
+
+                    <label class="text-xs text-gray-500 block">Opacity (@{{ Math.round((current.opacity ?? 1) * 100) }}%)
+                        <input type="range" min="0" max="1" step="0.1" class="w-full"
+                            v-model.number="current.opacity" @input="persist(current)" />
+                    </label>
+
+                    <label class="text-xs text-gray-500 block">Rotation (deg)
+                        <input type="number" class="mt-1 w-full border rounded px-2 py-1"
+                            v-model.number="current.rotation" @input="persist(current)" />
+                    </label>
                 </section>
 
                 <!-- Fields (placeholders) -->
                 <section class="space-y-3">
                     <div class="flex items-center justify-between">
-                        <h3 class="text-sm font-semibold text-gray-900">Text Fields</h3>
-                        <button @click="addField" class="text-sm text-blue-600 hover:text-blue-800">
-                            <i class="fa-solid fa-plus"></i> Add
-                        </button>
+                        <h3 class="font-semibold">Fields (placeholders)</h3>
                     </div>
-                    <div v-for="(field, index) in fields" :key="'field-editor-' + index" @click="selectField(index)"
-                        :class="['p-3 border-2 rounded cursor-pointer', index === selectedFieldIndex ?
-                            'border-blue-500 bg-blue-50' : 'border-gray-200'
-                        ]">
-                        <div class="flex items-center justify-between mb-2">
-                            <input v-model="field.label" placeholder="Field label"
-                                class="flex-1 text-sm font-medium border-b border-transparent hover:border-gray-300 focus:border-blue-500 outline-none px-1 bg-transparent" />
-                            <button @click.stop="removeField(index)" class="text-red-600 hover:text-red-800">
-                                <i class="fa-solid fa-trash text-xs"></i>
-                            </button>
+
+                    <div v-if="!fields.length" class="text-gray-500 text-sm">No fields yet.</div>
+
+                    <div v-for="(f, i) in fields" :key="'f-' + i" class="p-3 border rounded space-y-2">
+                        <div class="flex items-center gap-2">
+                            <input type="text" class="flex-1 px-2 py-1 text-sm border rounded"
+                                placeholder="Field key" v-model.trim="f.key" @input="onFieldChanged" />
+                            <label class="flex items-center gap-1 text-xs">
+                                <input type="checkbox" v-model="f.centerX" @change="onCenterXChange(i)" />
+                                Center X
+                            </label>
                         </div>
-                        <div class="grid grid-cols-2 gap-2 text-xs">
-                            <div>
-                                <label class="block text-gray-600">X</label>
-                                <input v-model.number="field.x" type="number"
-                                    class="w-full px-2 py-1 border rounded" />
-                            </div>
-                            <div>
-                                <label class="block text-gray-600">Y</label>
-                                <input v-model.number="field.y" type="number"
-                                    class="w-full px-2 py-1 border rounded" />
-                            </div>
-                            <div>
-                                <label class="block text-gray-600">Font Size</label>
-                                <input v-model.number="field.fontSize" type="number"
-                                    class="w-full px-2 py-1 border rounded" />
-                            </div>
-                            <div>
-                                <label class="block text-gray-600">Color</label>
-                                <select v-model="field.color" class="w-full px-2 py-1 border rounded">
+
+                        <div class="grid grid-cols-3 gap-2">
+                            <label class="text-xs text-gray-500">X
+                                <input type="number" class="mt-1 w-full border rounded px-2 py-1 text-sm"
+                                    v-model.number="f.x" :disabled="f.centerX" @input="onFieldChanged" />
+                            </label>
+                            <label class="text-xs text-gray-500">Y
+                                <input type="number" class="mt-1 w-full border rounded px-2 py-1 text-sm"
+                                    v-model.number="f.y" @input="onFieldChanged" />
+                            </label>
+                            <label class="text-xs text-gray-500">Font Size
+                                <input type="number" class="mt-1 w-full border rounded px-2 py-1 text-sm"
+                                    v-model.number="f.fontSize" @input="onFieldChanged" />
+                            </label>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="text-xs text-gray-500">Color
+                                <select class="mt-1 w-full border rounded px-2 py-1 text-sm" v-model="f.color"
+                                    @change="onFieldChanged">
                                     <option value="black">Black</option>
                                     <option value="white">White</option>
                                     <option value="gold">Gold</option>
                                     <option value="brown">Brown</option>
                                     <option value="gray">Gray</option>
                                 </select>
-                            </div>
-                            <div class="col-span-2">
-                                <label class="block text-gray-600">Font</label>
-                                <select v-model="field.font" class="w-full px-2 py-1 border rounded">
-                                    <option value="default">Default</option>
-                                    <option value="monotype">Monotype</option>
-                                    <option value="libre">Libre</option>
-                                </select>
-                            </div>
-                            <div class="col-span-2">
-                                <label class="block text-gray-600">Alignment</label>
-                                <select v-model="field.alignment" class="w-full px-2 py-1 border rounded">
+                            </label>
+                            <label class="text-xs text-gray-500">Alignment
+                                <select class="mt-1 w-full border rounded px-2 py-1 text-sm" v-model="f.alignment"
+                                    @change="onFieldChanged">
                                     <option value="left">Left</option>
                                     <option value="center">Center</option>
                                     <option value="right">Right</option>
                                 </select>
-                            </div>
+                            </label>
+                        </div>
+
+                        <div class="flex justify-between pt-1">
+                            <label class="text-xs text-gray-500 flex-1">Font
+                                <select class="mt-1 w-full border rounded px-2 py-1 text-sm" v-model="f.font"
+                                    @change="onFieldChanged">
+                                    <option value="default">Default</option>
+                                    <option value="monotype">Monotype</option>
+                                    <option value="libre">Libre</option>
+                                </select>
+                            </label>
                         </div>
                     </div>
                 </section>
 
                 <!-- Upload -->
                 <section>
-                    <h3 class="text-sm font-semibold text-gray-900 mb-3">Upload Element</h3>
-                    <input type="file" accept="image/png,image/jpeg" class="hidden" @change="onPickFile" />
-                    <div v-if="upload.file" class="mb-3 text-sm text-gray-700">
-                        Selected: <strong>@{{ upload.file.name }}</strong>
-                    </div>
-                    <div class="flex gap-2">
-                        <button @click="openUpload"
-                            class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">
-                            <i class="fa-solid fa-image mr-1"></i> Choose Image
+                    <h3 class="font-semibold mb-2">Add Element</h3>
+                    <div class="space-y-2">
+                        <input type="text" class="w-full border rounded px-2 py-2"
+                            placeholder="Name (e.g. Signature)" v-model.trim="upload.name">
+                        <select class="w-full border rounded px-2 py-2" v-model="upload.type">
+                            <option value="signature">Signature</option>
+                            <option value="seal">Seal</option>
+                            <option value="logo">Logo</option>
+                            <option value="decoration">Decoration</option>
+                            <option value="other">Other</option>
+                        </select>
+                        <input type="file" accept="image/*" class="w-full border rounded px-2 py-2"
+                            @change="onPickFile" />
+                        <button
+                            @click="doUpload"
+                            :disabled="!upload.file || !upload.name || isUploading"
+                            class="w-full px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
+                            <i class="fa-solid fa-upload mr-2"></i> Upload & Add
                         </button>
-                        <button v-if="upload.file" @click="uploadElement" :disabled="upload.loading"
-                            class="flex-1 px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
-                            <i class="fa-solid fa-upload mr-1"></i> Upload
-                        </button>
+                        <div v-if="isUploading" class="w-full bg-gray-200 rounded h-2">
+                            <div class="bg-blue-600 h-2 rounded transition-all" :style="{ width: uploadProgress + '%' }">
+                            </div>
+                        </div>
                     </div>
+                    <p class="text-xs text-gray-500 mt-2">Or drop an image directly on the canvas.</p>
                 </section>
             </aside>
         </div>
@@ -402,49 +449,64 @@
         createApp({
             data() {
                 return {
-                    // Template data
-                    tpl: @json($tplPayload),
+                    template: @json($tplPayload),
                     elements: @json($elsPayload),
 
-                    // Selection
+                    // Load fields from controller (properly transformed)
+                    fields: @json($fieldConfiguration),
+
+                    scale: 0.5,
                     selectedId: null,
                     selectedFieldIndex: null,
 
-                    // Canvas scale
-                    scale: 1,
-                    computedWidth: 600,
+                    // click/drag state tracking
+                    isDragging: false,
+                    clickTimeout: null,
 
-                    // Fields (text placeholders)
-                    fields: @json($template->field_configuration['fields'] ?? []),
+                    // real background pixel size (used for accurate scaling)
+                    bgW: null,
+                    bgH: null,
 
-                    // Upload
+                    // upload
+                    isUploading: false,
+                    uploadProgress: 0,
                     upload: {
-                        file: null,
-                        loading: false
+                        name: '',
+                        type: 'signature',
+                        file: null
                     },
 
-                    // Preview
-                    previewImage: null,
-                    previewTimer: null,
+                    toast: '',
+                    storageBase: "{{ asset('storage') }}",
 
-                    // Toast
-                    toast: null
-                };
+                    urls: {
+                        upload: "{{ route('designer.elements.upload', $template) }}",
+                        generate: "{{ route('designer.generate', $template) }}",
+                        preview: "{{ route('designer.preview', $template) }}",
+                        saveConfig: "{{ route('designer.save-configuration', $template) }}",
+                        update: "{{ route('designer.elements.update', ['template' => $template, 'element' => 'ELEMENT_ID']) }}",
+                        delete: "{{ route('designer.elements.delete', ['template' => $template, 'element' => 'ELEMENT_ID']) }}",
+                    },
+
+                    // live preview state
+                    previewUrl: '',
+                    previewLoading: false,
+                    _previewDebounceTimer: null,
+                    _previewMaxWaitTimer: null,
+                    _previewPending: false,
+                }
             },
             computed: {
                 current() {
                     return this.elements.find(e => e.id === this.selectedId) || null;
                 },
                 canvasStyle() {
-                    const w = this.computedWidth;
-                    const h = (this.tpl.height / this.tpl.width) * w;
+                    const W = this.bgW || this.template.width || 1600;
+                    const H = this.bgH || this.template.height || 1200;
                     return {
-                        width: w + 'px',
-                        height: h + 'px'
+                        width: (W * this.scale) + 'px',
+                        height: (H * this.scale) + 'px'
                     };
-                },
-                backgroundImageUrl() {
-                    return '/storage/' + this.tpl.background_image;
                 }
             },
             methods: {
@@ -455,30 +517,43 @@
                         top: (el.y_position * this.scale) + 'px',
                         width: (el.width * this.scale) + 'px',
                         height: (el.height * this.scale) + 'px',
-                        opacity: el.opacity || 1,
-                        zIndex: el.z_index || 1
+                        zIndex: el.z_index ?? 1,
+                        opacity: el.opacity ?? 1,
+                        transform: `rotate(${el.rotation ?? 0}deg)`
                     };
                 },
                 select(id) {
                     this.selectedId = id;
-                    this.selectedFieldIndex = null; // Clear field selection when selecting element
+                    this.selectedFieldIndex = null;
                 },
                 selectField(index) {
                     this.selectedFieldIndex = index;
-                    this.selectedId = null; // Clear element selection when selecting field
+                    this.selectedId = null;
                 },
                 clearSelections() {
                     this.selectedId = null;
                     this.selectedFieldIndex = null;
                 },
                 handleElementMouseDown(id, event) {
+                    if (this.clickTimeout) {
+                        clearTimeout(this.clickTimeout);
+                        this.clickTimeout = null;
+                    }
                     if (event.target.classList.contains('resize-handle')) return;
-                    this.select(id);
-                    event.stopPropagation();
+                    this.clickTimeout = setTimeout(() => {
+                        if (!this.isDragging) this.select(id);
+                        this.clickTimeout = null;
+                    }, 150);
                 },
                 handleFieldMouseDown(index, event) {
-                    this.selectField(index);
-                    event.stopPropagation();
+                    if (this.clickTimeout) {
+                        clearTimeout(this.clickTimeout);
+                        this.clickTimeout = null;
+                    }
+                    this.clickTimeout = setTimeout(() => {
+                        if (!this.isDragging) this.selectField(index);
+                        this.clickTimeout = null;
+                    }, 150);
                 },
 
                 /* --------- upload --------- */
@@ -491,236 +566,505 @@
 
                 /* --------- bg load + scale --------- */
                 onBgLoaded(e) {
-                    const img = e.target;
+                    this.bgW = e.target.naturalWidth;
+                    this.bgH = e.target.naturalHeight;
                     this.recalcScale();
                 },
 
                 /* --------- DnD --------- */
                 onDragOver(e) {
-                    e.preventDefault();
+                    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
                     e.currentTarget.classList.add('drag-over');
                 },
-
-                onDrop(e) {
-                    e.preventDefault();
+                onDragLeave(e) {
                     e.currentTarget.classList.remove('drag-over');
-                    // Handle file drop if needed
                 },
-
-                /* --------- fields --------- */
-                addField() {
-                    this.fields.push({
-                        label: 'Field ' + (this.fields.length + 1),
-                        x: 100,
-                        y: 100,
-                        fontSize: 60,
-                        color: 'black',
-                        font: 'default',
-                        alignment: 'left'
-                    });
-                },
-                removeField(index) {
-                    if (confirm('Remove this field?')) {
-                        this.fields.splice(index, 1);
-                        this.selectedFieldIndex = null;
-                    }
-                },
-                fieldMarkerStyle(field) {
-                    return {
-                        left: (field.x * this.scale) + 'px',
-                        top: (field.y * this.scale) + 'px'
+                onDrop(e) {
+                    e.currentTarget.classList.remove('drag-over');
+                    const f = e.dataTransfer?.files?.[0];
+                    if (!f) return;
+                    if (!f.type.startsWith('image/')) return this.toastMsg('Please drop an image.');
+                    this.upload = {
+                        name: f.name.replace(/\.[^.]+$/, '') || 'Element',
+                        type: 'signature',
+                        file: f
                     };
+                    this.doUpload();
                 },
 
-                /* --------- helpers --------- */
-                getImageUrl(path) {
-                    return path.startsWith('http') ? path : '/storage/' + path;
-                },
+                doUpload() {
+                    if (!this.upload.file || !this.upload.name || !this.upload.type) return;
+                    const fd = new FormData();
+                    fd.append('image', this.upload.file);
+                    fd.append('name', this.upload.name);
+                    fd.append('type', this.upload.type);
 
-                showToast(msg) {
-                    this.toast = msg;
-                    clearTimeout(this.toastTimer);
-                    this.toastTimer = setTimeout(() => this.toast = null, 2500);
-                },
+                    this.isUploading = true;
+                    this.uploadProgress = 0;
 
-                recalcScale() {
-                    const canvas = this.$refs.canvas;
-                    if (!canvas) return;
-                    const rect = canvas.getBoundingClientRect();
-                    this.computedWidth = rect.width;
-                    this.scale = rect.width / this.tpl.width;
-                },
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', this.urls.upload, true);
+                    xhr.setRequestHeader('X-CSRF-TOKEN', document.querySelector('meta[name="csrf-token"]').content);
+                    xhr.setRequestHeader('Accept', 'application/json');
 
-                /* --------- API calls --------- */
-                async uploadElement() {
-                    if (!this.upload.file) return;
-                    const form = new FormData();
-                    form.append('name', this.upload.file.name);
-                    form.append('image', this.upload.file);
-                    form.append('x_position', 100);
-                    form.append('y_position', 100);
-                    form.append('width', 200);
-                    form.append('height', 200);
-
-                    this.upload.loading = true;
-                    try {
-                        const resp = await fetch(`/image-template/${this.tpl.id}/elements`, {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
-                            },
-                            body: form
-                        });
-                        const data = await resp.json();
-                        if (data.element) {
-                            this.elements.push(data.element);
-                            this.showToast('Element uploaded!');
-                            this.upload.file = null;
+                    xhr.upload.onprogress = (e) => {
+                        if (e.lengthComputable) this.uploadProgress = Math.round((e.loaded / e.total) * 100);
+                    };
+                    xhr.onreadystatechange = () => {
+                        if (xhr.readyState !== XMLHttpRequest.DONE) return;
+                        this.isUploading = false;
+                        try {
+                            const res = JSON.parse(xhr.responseText);
+                            if (xhr.status === 200 && res.success && res.element) {
+                                this.elements.push(res.element);
+                                this.toastMsg('Element uploaded successfully.');
+                                this.schedulePreview();
+                            } else {
+                                this.toastMsg(res.error || 'Upload failed');
+                            }
+                        } catch (err) {
+                            this.toastMsg('Upload failed');
                         }
-                    } catch (err) {
-                        console.error(err);
-                        this.showToast('Upload failed');
-                    } finally {
-                        this.upload.loading = false;
+                        this.upload = {
+                            name: '',
+                            type: 'signature',
+                            file: null
+                        };
+                        this.uploadProgress = 0;
+                    };
+                    xhr.send(fd);
+                },
+
+                async persist(el) {
+                    if (!el) return;
+                    const url = this.urls.update.replace('ELEMENT_ID', String(el.id));
+                    const body = {
+                        x_position: Math.round(Math.max(0, el.x_position)),
+                        y_position: Math.round(Math.max(0, el.y_position)),
+                        width: Math.round(Math.max(10, el.width)),
+                        height: Math.round(Math.max(10, el.height)),
+                        z_index: el.z_index ?? 1,
+                        opacity: el.opacity ?? 1,
+                        rotation: el.rotation ?? 0
+                    };
+                    try {
+                        const r = await fetch(url, {
+                            method: 'PUT',
+                            headers: {
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify(body)
+                        });
+                        const res = await r.json();
+                        if (!r.ok || !res.success) throw new Error(res.error || 'Save failed');
+                        this.schedulePreview();
+                    } catch (e) {
+                        this.toastMsg(e.message || 'Save failed');
                     }
                 },
 
-                async removeElement(id) {
+                async remove(el) {
+                    if (!el) return;
                     if (!confirm('Delete this element?')) return;
+                    const url = this.urls.delete.replace('ELEMENT_ID', String(el.id));
                     try {
-                        await fetch(`/image-template/${this.tpl.id}/elements/${id}`, {
+                        const r = await fetch(url, {
                             method: 'DELETE',
                             headers: {
-                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'Accept': 'application/json'
                             }
                         });
-                        this.elements = this.elements.filter(e => e.id !== id);
-                        if (this.selectedId === id) this.selectedId = null;
-                        this.showToast('Element removed');
-                    } catch (err) {
-                        console.error(err);
-                        this.showToast('Delete failed');
+                        const res = await r.json();
+                        if (!r.ok || !res.success) throw new Error(res.error || 'Delete failed');
+                        this.elements = this.elements.filter(x => x.id !== el.id);
+                        if (this.selectedId === el.id) this.selectedId = null;
+                        this.toastMsg('Deleted.');
+                    } catch (e) {
+                        this.toastMsg(e.message || 'Delete failed');
                     }
                 },
 
+                /* --------- placeholders (fields) --------- */
+                onCenterXChange(fieldIndex) {
+                    this.$nextTick(() => this.bindFieldInteract(fieldIndex));
+                    this.schedulePreview();
+                },
+                fieldStyle(f) {
+                    const W = this.bgW || this.template.width || 1600;
+                    const left = f.centerX ? (W * this.scale) / 2 : (f.x * this.scale);
+                    const top = (f.y * this.scale);
+                    return {
+                        left: left + 'px',
+                        top: top + 'px',
+                        zIndex: 9999
+                    };
+                },
+                buildConfig() {
+                    const fields = {};
+                    for (const f of this.fields) {
+                        if (!f.key) continue;
+                        fields[f.key] = {
+                            centerX: f.centerX ?? false,
+                            x: f.x ?? 0,
+                            y: f.y ?? 0,
+                            fontSize: f.fontSize ?? 64,
+                            color: f.color ?? 'black',
+                            alignment: f.alignment ?? 'center',
+                            font: f.font ?? 'default',
+                        };
+                    }
+                    return {
+                        template: this.template.background_image,
+                        fields,
+                    };
+                },
+                onFieldChanged() {
+                    this.schedulePreview();
+                },
                 async saveConfiguration() {
+                    const cfg = this.buildConfig();
+
                     try {
-                        await fetch(`/image-template/${this.tpl.id}/save-configuration`, {
+                        const res = await fetch(this.urls.saveConfig, {
                             method: 'POST',
                             headers: {
-                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
-                                'Content-Type': 'application/json'
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json'
                             },
-                            body: JSON.stringify({
-                                elements: this.elements,
-                                fields: this.fields
-                            })
+                            body: JSON.stringify(cfg)
                         });
-                        this.showToast('Configuration saved');
+
+                        const data = await res.json();
+                        if (data.success) {
+                            this.toastMsg(data.message || 'Configuration saved successfully.');
+                        } else {
+                            this.toastMsg(data.error || 'Failed to save configuration.');
+                        }
                     } catch (err) {
                         console.error(err);
-                        this.showToast('Save failed');
+                        this.toastMsg('Failed to save configuration.');
                     }
                 },
-
-                schedulePreview() {
-                    clearTimeout(this.previewTimer);
-                    this.previewTimer = setTimeout(() => this.preview(), 1000);
+                downloadConfig() {
+                    const cfg = this.buildConfig();
+                    const blob = new Blob([JSON.stringify(cfg, null, 2)], {
+                        type: 'application/json'
+                    });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `template-config-${this.template.id}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    a.remove();
+                    this.toastMsg('Config exported.');
                 },
 
-                async preview() {
-                    await this.saveConfiguration();
-                    try {
-                        const url = `/image-template/${this.tpl.id}/preview?t=${Date.now()}`;
-                        this.previewImage = url;
-                    } catch (err) {
-                        console.error(err);
-                        this.showToast('Preview failed');
-                    }
-                },
-
+                /* --------- generate --------- */
                 async generate() {
-                    await this.saveConfiguration();
                     try {
-                        const resp = await fetch(`/image-template/${this.tpl.id}/generate`, {
+                        await this.saveConfiguration();
+                        const r = await fetch(this.urls.generate, {
                             method: 'POST',
                             headers: {
-                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'Accept': 'application/json'
                             }
                         });
-                        const data = await resp.json();
-                        if (data.success) {
-                            this.showToast('Generated! Saved to: ' + data.filename);
+                        const data = await r.json();
+                        if (data.success && data.url) {
                             window.open(data.url, '_blank');
+                        } else {
+                            this.toastMsg(data.error || 'Generation failed');
                         }
-                    } catch (err) {
-                        console.error(err);
-                        this.showToast('Generation failed');
+                        this.toastMsg('Saved.');
+                    } catch (e) {
+                        this.toastMsg(e.message || 'Generation failed');
                     }
                 },
 
-                /* --------- interact.js --------- */
-                initInteract() {
-                    const vm = this;
+                /* --------- preview --------- */
+                async preview() {
+                    try {
+                        await this.saveConfiguration();
+                    } catch (_) {
+                        // continue anyway
+                    }
 
-                    // Elements dragging and resizing
-                    interact('.template-element').draggable({
-                        onstart(event) {
-                            event.target.classList.add('is-dragging');
-                        },
-                        onmove(event) {
-                            const el = vm.elements.find(e => e.id === vm.selectedId);
-                            if (!el) return;
-                            el.x_position += event.dx / vm.scale;
-                            el.y_position += event.dy / vm.scale;
-                        },
-                        onend(event) {
-                            event.target.classList.remove('is-dragging');
-                            vm.schedulePreview();
-                        }
-                    }).resizable({
-                        edges: {
-                            bottom: '.resize-handle',
-                            right: '.resize-handle'
-                        },
-                        onmove(event) {
-                            const el = vm.elements.find(e => e.id === vm.selectedId);
-                            if (!el) return;
-                            el.width += event.deltaRect.width / vm.scale;
-                            el.height += event.deltaRect.height / vm.scale;
-                        },
-                        onend() {
-                            vm.schedulePreview();
-                        }
+                    window.open(this.urls.preview, '_blank');
+                },
+
+                /* --------- auto live preview (debounced with maxWait) --------- */
+                schedulePreview() {
+                    this._previewPending = true;
+                    if (this._previewDebounceTimer) clearTimeout(this._previewDebounceTimer);
+                    this._previewDebounceTimer = setTimeout(() => this._firePreview(), 1000);
+                    if (!this._previewMaxWaitTimer) {
+                        this._previewMaxWaitTimer = setTimeout(() => this._firePreview(), 10000);
+                    }
+                },
+                async _firePreview() {
+                    if (!this._previewPending) return;
+                    this._previewPending = false;
+                    if (this._previewDebounceTimer) {
+                        clearTimeout(this._previewDebounceTimer);
+                        this._previewDebounceTimer = null;
+                    }
+                    if (this._previewMaxWaitTimer) {
+                        clearTimeout(this._previewMaxWaitTimer);
+                        this._previewMaxWaitTimer = null;
+                    }
+
+                    this.previewLoading = true;
+                    try {
+                        await this.saveConfiguration();
+                    } catch (_) {
+                        // ignore
+                    }
+
+                    this.previewUrl = this.urls.preview + '?t=' + Date.now();
+                },
+                onPreviewLoaded() {
+                    this.previewLoading = false;
+                },
+                onPreviewError() {
+                    this.previewLoading = false;
+                },
+
+                /* --------- zoom / zIndex --------- */
+                zoomIn() {
+                    this.scale = Math.min(2, +(this.scale + 0.1).toFixed(2));
+                },
+                zoomOut() {
+                    this.scale = Math.max(0.1, +(this.scale - 0.1).toFixed(2));
+                },
+                resetZoom() {
+                    this.scale = 0.5;
+                },
+                zUp(el) {
+                    el.z_index = Math.min(100, (el.z_index ?? 1) + 1);
+                    this.persist(el);
+                },
+                zDown(el) {
+                    el.z_index = Math.max(0, (el.z_index ?? 1) - 1);
+                    this.persist(el);
+                },
+
+                bindAll() {
+                    if (typeof window.interact !== 'function') {
+                        console.warn('Interact.js not loaded');
+                        return;
+                    }
+                    this.$nextTick(() => {
+                        this.elements.forEach(e => this.bindInteract(e.id));
+                        this.fields.forEach((f, i) => this.bindFieldInteract(i));
                     });
+                },
+                bindInteract(id) {
+                    const sel = '#el-' + id;
+                    const node = document.querySelector(sel);
+                    const self = this;
+                    if (!node) return;
 
-                    // Field markers dragging
-                    interact('.field-marker').draggable({
-                        onstart(event) {
-                            event.target.classList.add('is-dragging');
-                        },
-                        onmove(event) {
-                            const field = vm.fields[vm.selectedFieldIndex];
-                            if (!field) return;
-                            field.x += event.dx / vm.scale;
-                            field.y += event.dy / vm.scale;
-                        },
-                        onend(event) {
-                            event.target.classList.remove('is-dragging');
-                            vm.schedulePreview();
+                    interact(node)
+                        .draggable({
+                            inertia: false,
+                            modifiers: [],
+                            listeners: {
+                                start(event) {
+                                    self.isDragging = true;
+                                    event.target.classList.add('is-dragging');
+                                },
+                                move(event) {
+                                    const el = self.elements.find(x => x.id === id);
+                                    if (!el) return;
+                                    el.x_position = Math.round(el.x_position + event.dx / self.scale);
+                                    el.y_position = Math.round(el.y_position + event.dy / self.scale);
+                                },
+                                end(event) {
+                                    event.target.classList.remove('is-dragging');
+                                    const el = self.elements.find(x => x.id === id);
+                                    if (el) self.persist(el);
+                                    setTimeout(() => {
+                                        self.isDragging = false;
+                                    }, 200);
+                                }
+                            }
+                        })
+                        .resizable({
+                            edges: {
+                                left: false,
+                                right: '.resize-handle',
+                                bottom: '.resize-handle',
+                                top: false
+                            },
+                            listeners: {
+                                start() {
+                                    self.isDragging = true;
+                                },
+                                move(event) {
+                                    const el = self.elements.find(x => x.id === id);
+                                    if (!el) return;
+                                    el.width = Math.round(el.width + event.deltaRect.width / self.scale);
+                                    el.height = Math.round(el.height + event.deltaRect.height / self.scale);
+                                    el.x_position = Math.round(el.x_position + event.deltaRect.left / self.scale);
+                                    el.y_position = Math.round(el.y_position + event.deltaRect.top / self.scale);
+                                },
+                                end() {
+                                    const el = self.elements.find(x => x.id === id);
+                                    if (el) self.persist(el);
+                                    setTimeout(() => {
+                                        self.isDragging = false;
+                                    }, 200);
+                                }
+                            },
+                            modifiers: [
+                                interact.modifiers.restrictSize({
+                                    min: {
+                                        width: 10,
+                                        height: 10
+                                    }
+                                })
+                            ]
+                        });
+                },
+
+                bindFieldInteract(fieldIndex) {
+                    const sel = '#field-' + fieldIndex;
+                    const node = document.querySelector(sel);
+                    const self = this;
+                    if (!node) return;
+
+                    interact(node).unset();
+
+                    interact(node)
+                        .draggable({
+                            inertia: false,
+                            modifiers: [],
+                            listeners: {
+                                start(event) {
+                                    self.isDragging = true;
+                                    event.target.classList.add('is-dragging');
+                                },
+                                move(event) {
+                                    const f = self.fields[fieldIndex];
+                                    if (!f) return;
+                                    if (!f.centerX) {
+                                        f.x = Math.round(f.x + event.dx / self.scale);
+                                    }
+                                    f.y = Math.round(f.y + event.dy / self.scale);
+                                },
+                                end(event) {
+                                    event.target.classList.remove('is-dragging');
+                                    self.schedulePreview();
+                                    setTimeout(() => {
+                                        self.isDragging = false;
+                                    }, 200);
+                                }
+                            }
+                        });
+                },
+
+                onKey(e) {
+                    const step = e.shiftKey ? 10 : 1;
+
+                    if (this.current) {
+                        if (e.key === 'Delete' || e.key === 'Backspace') {
+                            e.preventDefault();
+                            this.remove(this.current);
+                        } else if (e.key === 'ArrowLeft') {
+                            e.preventDefault();
+                            this.current.x_position -= step;
+                            this.persist(this.current);
+                        } else if (e.key === 'ArrowRight') {
+                            e.preventDefault();
+                            this.current.x_position += step;
+                            this.persist(this.current);
+                        } else if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            this.current.y_position -= step;
+                            this.persist(this.current);
+                        } else if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            this.current.y_position += step;
+                            this.persist(this.current);
                         }
+                    }
+
+                    else if (this.selectedFieldIndex !== null) {
+                        const f = this.fields[this.selectedFieldIndex];
+                        if (!f) return;
+                        if (e.key === 'ArrowLeft' && !f.centerX) {
+                            e.preventDefault();
+                            f.x -= step;
+                            this.schedulePreview();
+                        } else if (e.key === 'ArrowRight' && !f.centerX) {
+                            e.preventDefault();
+                            f.x += step;
+                            this.schedulePreview();
+                        } else if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            f.y -= step;
+                            this.schedulePreview();
+                        } else if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            f.y += step;
+                            this.schedulePreview();
+                        }
+                    }
+
+                    if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+')) {
+                        e.preventDefault();
+                        this.zoomIn();
+                    }
+                    if ((e.ctrlKey || e.metaKey) && e.key === '-') {
+                        e.preventDefault();
+                        this.zoomOut();
+                    }
+                    if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+                        e.preventDefault();
+                        this.resetZoom();
+                    }
+                },
+
+                toastMsg(msg) {
+                    this.toast = msg;
+                    setTimeout(() => this.toast = '', 2200);
+                },
+                recalcScale() {
+                    nextTick(() => {
+                        const canvas = this.$refs.canvas;
+                        if (!canvas) return;
+                        const W = this.bgW || this.template.width || 1600;
+                        const H = this.bgH || this.template.height || 1200;
+                        const parent = canvas.parentElement;
+                        const sX = (parent.clientWidth - 64) / W;
+                        const sY = (parent.clientHeight - 64) / H;
+                        this.scale = Math.min(1, Math.max(0.2, Math.floor(Math.min(sX, sY) * 10) / 10));
                     });
                 }
             },
             mounted() {
-                window.addEventListener('resize', () => this.recalcScale());
+                this.bindAll();
+                window.addEventListener('resize', this.recalcScale);
+                window.addEventListener('keydown', this.onKey);
                 this.recalcScale();
-                this.initInteract();
                 this.schedulePreview();
             },
             beforeUnmount() {
-                clearTimeout(this.previewTimer);
-                clearTimeout(this.toastTimer);
+                window.removeEventListener('resize', this.recalcScale);
+                window.removeEventListener('keydown', this.onKey);
+                if (this.clickTimeout) {
+                    clearTimeout(this.clickTimeout);
+                    this.clickTimeout = null;
+                }
+                if (this._previewDebounceTimer) clearTimeout(this._previewDebounceTimer);
+                if (this._previewMaxWaitTimer) clearTimeout(this._previewMaxWaitTimer);
             }
         }).mount('#app');
     </script>
