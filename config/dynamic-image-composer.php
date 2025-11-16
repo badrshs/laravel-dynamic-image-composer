@@ -52,7 +52,7 @@ return [
     |
     */
     'fonts_storage' => env('DYNAMIC_IMAGE_FONTS_STORAGE', 'storage'), // 'storage' or 'public'
-    
+
     'fonts_directory' => 'fonts',
 
     /*

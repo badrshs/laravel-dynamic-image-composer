@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Artisan;
 
 class InstallCommand extends Command
 {
-    protected $signature = 'dynamic-image-composer:install 
+    protected $signature = 'dynamic-image-composer:install
                             {--force : Overwrite existing files}
                             {--with-fonts : Include default fonts}';
 
@@ -75,7 +75,7 @@ class InstallCommand extends Command
         $this->newLine();
         $this->info('🎉 Dynamic Image Composer installed successfully!');
         $this->newLine();
-        
+
         $this->line('Next steps:');
         $this->line('1. Configure fonts and colors in config/dynamic-image-composer.php');
         $this->line('2. Add your custom fonts to storage/app/public/fonts/');

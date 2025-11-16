@@ -407,10 +407,10 @@ class TemplateDesignerController
         }
 
         $text = (string) $config['value'];
-        
+
         // Check if text is Arabic
         $isArabic = preg_match('/\p{Arabic}/u', $text) === 1;
-        
+
         if ($isArabic) {
             $arabic = new \ArPHP\I18N\Arabic();
             $text = $arabic->utf8Glyphs($text);
@@ -421,7 +421,7 @@ class TemplateDesignerController
         $langKey = $isArabic ? 'ar' : 'en';
         $fonts = config('dynamic-image-composer.fonts', []);
         $fontFile = $fonts[$fontStyle][$langKey] ?? $fonts['default'][$langKey] ?? 'Museo500-Regular.ttf';
-        
+
         // Try multiple font locations
         $fontPath = $this->findFontPath($fontFile);
 
@@ -437,7 +437,7 @@ class TemplateDesignerController
         // Calculate X position based on alignment
         $x = $config['x'] ?? 0;
         $alignment = $config['alignment'] ?? 'left';
-        
+
         if ($fontPath && file_exists($fontPath)) {
             if ($x === 'center' || $alignment === 'center') {
                 $box = imagettfbbox($fontSize, 0, $fontPath, $text);
@@ -467,7 +467,7 @@ class TemplateDesignerController
     protected function findFontPath(string $fontFile): ?string
     {
         $fontsDir = config('dynamic-image-composer.fonts_directory', 'fonts');
-        
+
         // Try storage/app/public/fonts
         $storagePath = storage_path("app/public/{$fontsDir}/{$fontFile}");
         if (file_exists($storagePath)) {
@@ -487,7 +487,8 @@ class TemplateDesignerController
         }
 
         return null;
-    }    /**
+    }
+    /**
      * Create image from file
      */
     protected function createImageFromFile(string $path)
